@@ -1,3 +1,4 @@
+import java.io.File;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -9,19 +10,21 @@ import java.util.Scanner;
 public class Proxy implements Runnable {
 
     public static void main(String[] args) throws IOException {
+        //local host port where the requests can be made
         Proxy proxy = new Proxy(12345);
         proxy.listen();
     }
 
-    static HashMap<String, String> cache;
+    static HashMap<String, ResponseRecord> cache2;
     static HashMap<String, String> blockedUrls;
     private ServerSocket serverSocket;
     private boolean running = true;
+    //Requirement 5 is to handle multiple requests simultaneously by implementing threading
     static ArrayList<Thread> inProgress;
 
-
+    //making proxy object
     public Proxy(int port) throws IOException {
-        cache = new HashMap<>();
+        cache2 = new HashMap<>();
         blockedUrls = new HashMap<>();
         inProgress = new ArrayList<>();
         new Thread(this).start();
@@ -30,11 +33,13 @@ public class Proxy implements Runnable {
             serverSocket = new ServerSocket(port);
             running = true;
             System.out.println("Waiting for client on port " + serverSocket.getLocalPort());
+            //to make request go to http://localhost:12345
         } catch (SocketException e) {
             System.out.println("Socket exception");
         }
     }
 
+    //listening for requests on the port on localhost
     public void listen() {
         while (running) {
             try {
@@ -57,7 +62,7 @@ public class Proxy implements Runnable {
                 System.out.println("Press a key");
                 System.out.println("b = block a site");
                 System.out.println("q = quit server");
-                System.out.println("or make request in browser at local host 12345");
+                System.out.println("or make request in browser at http://localhost:12345");
                 action = scanner.next();
 
                 if(action.equalsIgnoreCase("b")){
@@ -108,7 +113,7 @@ public class Proxy implements Runnable {
         Checks if the URL is in the `cached` URL hashmap and returns boolean
      */
     public static boolean isCached(String url){
-        if(cache.get(url) != null)
+        if(cache2.get(url) != null)
         {
             return true;
         }
@@ -116,9 +121,9 @@ public class Proxy implements Runnable {
     }
 
     /*
-            Caches url passed in as a parameter by adding it to the cached url hashmap
-         */
-    public static void cacheUrl(String url)
+         Caches url passed in as a parameter by adding it to the cached url hashmap
+    */
+    public static void cacheUrl(String url, ResponseRecord rr)
     {
         if(isCached(url))
         {
@@ -126,10 +131,19 @@ public class Proxy implements Runnable {
         }
         else
         {
-            cache.put(url,url);
+            //cache.put(url,url);
+            cache2.put(url, rr);
             System.out.println("Site added to cached list successfully");
         }
     }
+
+    /*
+        Removes expired url from cache
+     */
+    public static void removeUrlFromCache(String url){
+        cache2.remove(url);
+    }
+
 
 }
 
