@@ -19,6 +19,16 @@ public class ResponseRecord {
         this.TTL = today.plusDays(3);
     }
 
+    public void setData(String data)
+    {
+        this.data = data;
+    }
+
+    public void setFile(File site)
+    {
+        this.site = site;
+    }
+
     public boolean checkTTL(){
         LocalDate today = LocalDate.now();
         Period difference = Period.between(TTL, today);

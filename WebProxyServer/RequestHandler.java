@@ -45,15 +45,8 @@ public class RequestHandler implements Runnable {
                     return;
                 }
 
-                //check if in cache
-                if (Proxy.isCached(url)) {
-                    System.out.println("Cached site");
-                    requestForCached(url);
-                    return;
-                }
-
                 //send request to web server
-                requestForUrl(url);
+                requestForUrl(url, null);
             }
         }
         catch (IOException e)
@@ -68,20 +61,30 @@ public class RequestHandler implements Runnable {
     private void requestForBlockedSite() throws IOException {
         try{
             //return negative response to client
+            BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
             String repsonseToClient = "HTTP/1.0 403 Access Forbidden \n" +
                     "Proxy-agent: ProxyServer/1.0\n" +
                     "\r\n";
+            bw.write(repsonseToClient);
             proxyToClientBw.write(repsonseToClient);
             System.out.println(repsonseToClient);
+            bw.flush();
             proxyToClientBw.flush();
         } catch(IOException e){
-            System.out.println("Error writing to client when requested a blocked site");
+            System.out.println("Error letting client know site is blocked");
             e.printStackTrace();
         }
     }
 
-    //this sends request to web server, un-cached url
-    private void requestForUrl(String url) throws IOException {
+    //this sends request to web server
+    private void requestForUrl(String url, ResponseRecord rr) throws IOException {
+        //check if in cache
+        if (Proxy.isCached(url)) {
+            System.out.println("Cached site");
+            requestForCached(url);
+            return;
+        }
+
         URL site = new URL(url);
         System.out.println("url requested: " + url);
 
@@ -93,6 +96,13 @@ public class RequestHandler implements Runnable {
         String responseMessage = proxyToServerConnection.getResponseMessage();
         String response = "Response code : " + responseCode + " " + responseMessage;
         System.out.println(response);
+
+        if(responseCode == 301)
+        {
+            String redirectedURL = proxyToServerConnection.getHeaderField("Location");
+            ResponseRecord responseRecord = new ResponseRecord(url, "CNAME", null, null);
+            requestForUrl(redirectedURL, responseRecord);
+        }
 
         if(responseCode == 200) {
             //return positive response to client
@@ -132,7 +142,15 @@ public class RequestHandler implements Runnable {
         }
 
         //create resource record from file
-            ResponseRecord rr = new ResponseRecord(url, "CNAME", response, cachedFile);
+            if(rr != null)
+            {
+                rr = new ResponseRecord(url, "CNAME", response, cachedFile);
+            }
+            else //it is coming from a redirect
+            {
+                rr.setData(response);
+                rr.setFile(cachedFile);
+            }
 
             //add this response record to the cache
             Proxy.cacheUrl(url, rr);
@@ -154,7 +172,7 @@ public class RequestHandler implements Runnable {
             Proxy.removeUrlFromCache(url);
 
             //request for it from web server instead
-            requestForUrl(url);
+            requestForUrl(url, null);
         }
         else
         {
